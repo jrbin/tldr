@@ -2,7 +2,7 @@
 
 A Vue.js web client for [tldr-pages](https://github.com/tldr-pages/tldr) project.
 
-Please see the running site [here](https://jrbin.github.io/tldr).
+Please see the running site [here](https://jrbin.github.io/tldr/).
 
 ## Build Setup
 
