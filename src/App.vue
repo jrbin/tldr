@@ -5,7 +5,11 @@
         <h1 class="is-size-5">TLDR</h1>
       </div>
       <div class="level-item">
-        <input class="input" type="text" placeholder="Command Name" @input="fetchDocs">
+        <search-input
+          :commands="commands"
+          @fetchDocs="fetchDocs"
+          @inputEmpty="notFound=false">
+        </search-input>
       </div>
     </div>
     <div v-if="loading" class="content more-padding">
@@ -21,7 +25,7 @@
       </div>
       <div class="content" v-html="activeContent"></div>
     </div>
-    <div v-else-if="query" class="content more-padding">
+    <div v-else-if="notFound" class="content more-padding">
       <h1>Oops! Command not found!</h1>
       <p>We looked and looked for it, but it's nowhere. Maybe you can help us find it?</p>
       <p>TLDR is a community effort, we need people like you to raise the bar and find missing commands, suggest editions, and propose new pages.</p>
@@ -79,9 +83,30 @@
 </template>
 
 <script>
-import {debounce} from "lodash";
+import _ from "lodash";
 import marked from "marked";
 import Modal from "./Modal.vue";
+import SearchInput from "./SearchInput.vue";
+
+// test data
+const categories = [
+  {
+    id: 0,
+    name: "common",
+    url: "",
+    children: ["7z", "tar", "echo", "sed", "grep", "awk", "sort"],
+  },
+  {
+    id: 1,
+    name: "osx",
+    children: ["du", "say"],
+  },
+  {
+    id: 2,
+    name: "linux",
+    children: ["du", "adduser"]
+  }
+]
 
 function fetchStatus(response) {
   if (response.status >= 200 && response.status < 300) {
@@ -101,14 +126,14 @@ function fetchError(error) {
 
 export default {
   name: "app",
-  components: { Modal },
+  components: { Modal, SearchInput },
   data() {
     return {
-      query: "",
       docs: [],
-      categories: [],
+      categories: categories,
       loading: false,
       showModal: false,
+      notFound: false,
     };
   },
   computed: {
@@ -118,6 +143,9 @@ export default {
         return activeDoc.content;
       }
       return "";
+    },
+    commands() {
+      return this.categories.map(c => c.children).reduce((acc, cur) => _.union(acc, cur));
     }
   },
   created() {
@@ -152,19 +180,18 @@ export default {
       .catch(error => this.showModal = true);
   },
   methods: {
-    fetchDocs: debounce(function(e) {
-      this.query = e.target.value;
+    fetchDocs(command) {
       this.error = "";
       let requests = [];
       for (let i = 0, j = -1; i < this.categories.length; i++) {
         let category = this.categories[i];
-        if (!category.children.includes(this.query)) {
+        if (!category.children.includes(command)) {
           continue;
         }
         j++;
         let categoryName = encodeURIComponent(category.name);
-        let query = encodeURIComponent(this.query);
-        let url = `https://api.github.com/repos/tldr-pages/tldr/contents/pages/${categoryName}/${query}.md`;
+        command = encodeURIComponent(command);
+        let url = `https://api.github.com/repos/tldr-pages/tldr/contents/pages/${categoryName}/${command}.md`;
         let request = fetch(url)
           .then(fetchStatus)
           .then(fetchJson)
@@ -178,8 +205,10 @@ export default {
       }
       if (requests.length === 0) {
         this.docs = [];
+        this.notFound = true;
         return;
       }
+      this.notFound = false;
       this.loading = true;
       Promise.all(requests)
         .then(values => {
@@ -192,7 +221,7 @@ export default {
         .finally(() => {
           this.loading = false;
         });
-    }, 500),
+    },
     setActive(activeDoc) {
       this.docs.forEach(doc => (doc.active = doc === activeDoc));
     }
